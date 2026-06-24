@@ -87,6 +87,9 @@ services:
       args:
         VITE_API_URL: ""
         VITE_YANDEX_MAPS_API_KEY: ${VITE_YANDEX_MAPS_API_KEY:-}
+    environment:
+      VITE_API_PROXY_TARGET: http://api:8000
+      VITE_STORAGE_PROXY_TARGET: http://minio:9000
     ports:
       - "80:80"
     depends_on:
