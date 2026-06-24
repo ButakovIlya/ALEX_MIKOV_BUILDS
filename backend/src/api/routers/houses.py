@@ -2,7 +2,7 @@ from uuid import UUID
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from api.schemas.houses import (
     HouseGlbOut,
@@ -92,23 +92,22 @@ def video_link_to_out(link: HouseVideoLinkEntity) -> HouseVideoLinkOut:
     )
 
 
-def glb_to_out(house_id: UUID, model: HouseModelEntity, s3: S3Storage | None = None) -> HouseGlbOut:
-    direct_url = s3.get_public_download_url(model.s3_key) if s3 else None
+def glb_to_out(house_id: UUID, model: HouseModelEntity) -> HouseGlbOut:
     return HouseGlbOut(
         id=model.id,
-        url=direct_url or model_url(house_id),
+        url=model_url(house_id),
         original_filename=model.original_filename,
         file_size_bytes=model.file_size_bytes,
     )
 
 
-def model_list_url(house_id: UUID, glb: HouseModelEntity | None, s3: S3Storage) -> str | None:
+def model_list_url(house_id: UUID, glb: HouseModelEntity | None) -> str | None:
     if glb is None:
         return None
-    return s3.get_public_download_url(glb.s3_key) or model_url(house_id)
+    return model_url(house_id)
 
 
-async def build_house_out(uw: SqlAlchemyUnitOfWork, house: HouseEntity, s3: S3Storage | None = None) -> HouseOut:
+async def build_house_out(uw: SqlAlchemyUnitOfWork, house: HouseEntity) -> HouseOut:
     photos = await uw.house_photos.list_by_house(house.id)
     videos = await uw.house_videos.list_by_house(house.id)
     video_links = await uw.house_video_links.list_by_house(house.id)
@@ -125,7 +124,7 @@ async def build_house_out(uw: SqlAlchemyUnitOfWork, house: HouseEntity, s3: S3St
         photos=[photo_to_out(p) for p in photos],
         videos=[video_to_out(v) for v in videos],
         video_links=[video_link_to_out(l) for l in video_links],
-        model=glb_to_out(house.id, glb, s3) if glb else None,
+        model=glb_to_out(house.id, glb) if glb else None,
         created_at=house.created_at,
         **house_entity_to_specs_out(house),
     )
@@ -143,7 +142,6 @@ def cover_url_for_house(house: HouseEntity, photos: list[HousePhotoEntity]) -> s
 @inject
 async def list_houses(
     uow: SqlAlchemyUnitOfWork = Depends(Provide[Container.uow]),
-    s3: S3Storage = Depends(Provide[Container.s3]),
 ) -> list[HouseListItemOut]:
     async with uow() as uw:
         houses = await uw.houses.list_published()
@@ -162,7 +160,7 @@ async def list_houses(
                     area_sqm=house.area_sqm,
                     cover_url=cover_url_for_house(house, photos),
                     has_model=glb is not None,
-                    model_url=model_list_url(house.id, glb, s3),
+                    model_url=model_list_url(house.id, glb),
                     has_videos=bool(videos or video_links),
                     price_rub=house.price_rub,
                     object_type=house.object_type,
@@ -179,13 +177,12 @@ async def list_houses(
 async def get_house(
     house_id: UUID,
     uow: SqlAlchemyUnitOfWork = Depends(Provide[Container.uow]),
-    s3: S3Storage = Depends(Provide[Container.s3]),
 ) -> HouseOut:
     async with uow() as uw:
         house = await uw.houses.get_by_id(house_id)
         if house is None or not house.is_published:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="House not found")
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.get("/{house_id}/avatar/file")
@@ -261,9 +258,6 @@ async def download_model(
         if model is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
     try:
-        direct_url = s3.get_public_download_url(model.s3_key)
-        if direct_url:
-            return RedirectResponse(direct_url, status_code=307)
         stream, content_type = s3.get_object_stream(model.s3_key)
     except StorageError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
