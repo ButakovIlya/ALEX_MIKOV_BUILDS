@@ -1,0 +1,10 @@
+{
+  "demo-house.glb": {
+    "name": "Демо-проект",
+    "description": "Пример .glb модели коттеджа."
+  },
+  "swedish_cottage_diorama.glb": {
+    "name": "Swedish Cottage Diorama",
+    "description": "3D-модель шведского коттеджа."
+  }
+}

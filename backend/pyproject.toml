@@ -1,0 +1,169 @@
+[tool.poetry]
+name = "mikov-cottages-api"
+version = "1.0.0"
+description = "FastAPI backend for Mikov Cottages: houses, photos, 3D models, S3, PostgreSQL"
+authors = []
+readme = "README.md"
+packages = [
+    { include = "main.py", from = "src" },
+    { include = "api", from = "src" },
+    { include = "config", from = "src" },
+    { include = "domain", from = "src" },
+    { include = "infrastructure", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+fastapi = "^0.115.0"
+uvicorn = { extras = ["standard"], version = "^0.34.0" }
+pydantic = "^2.9.0"
+pydantic-settings = "^2.8.0"
+sqlalchemy = { extras = ["asyncio"], version = "^2.0.36" }
+asyncpg = "^0.30.0"
+psycopg2-binary = "^2.9.10"
+alembic = "^1.15.0"
+dependency-injector = "^4.46.0"
+python-multipart = "^0.0.20"
+python-jose = { extras = ["cryptography"], version = "^3.4.0" }
+passlib = { extras = ["bcrypt"], version = "^1.7.4" }
+bcrypt = "<5"
+boto3 = "^1.37.0"
+greenlet = "^3.1.0"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.8.0"
+mypy = "^1.20.0"
+pytest = "^9.0.3"
+pytest-asyncio = "^1.0.0"
+poethepoet = "^0.44.0"
+osmium = "^4.0.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py313"
+src = ["src", "tests", "alembic"]
+fix = true
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    "ANN401",
+    "ARG001",
+    "ARG002",
+    "B008",
+    "BLE001",
+    "COM812",
+    "EM101",
+    "EM102",
+    "ISC001",
+    "N818",
+    "PLR0913",
+    "PLR2004",
+    "S105",
+    "S106",
+    "TRY003",
+]
+fixable = ["ALL"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/**/*.py" = ["S101"]
+"alembic/**/*.py" = ["INP001"]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+multiline-quotes = "double"
+docstring-quotes = "double"
+
+[tool.ruff.format]
+quote-style = "single"
+line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.13"
+mypy_path = ["src"]
+explicit_package_bases = true
+namespace_packages = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+ignore_missing_imports = false
+show_error_codes = true
+warn_unused_ignores = true
+strict = false
+exclude = [".venv", "alembic"]
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+
+[[tool.mypy.overrides]]
+module = "dependency_injector.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "jose.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "passlib.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "boto3.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "botocore.*"
+ignore_missing_imports = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-vv -ra"
+asyncio_mode = "auto"
+
+[tool.poe.tasks.dev]
+cmd = "uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+env = { PYTHONPATH = "src" }
+
+[tool.poe.tasks.migrate]
+cmd = "alembic upgrade head"
+env = { PYTHONPATH = "src" }
+
+[tool.poe.tasks.lint]
+shell = "ruff format src tests alembic --check && ruff check src tests alembic"
+
+[tool.poe.tasks.ci-lint]
+shell = "ruff format src tests alembic --check && ruff check src tests alembic && PYTHONPATH=src mypy src"
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "**/__init__.py",
+    "src/main.py",
+    "src/config/*",
+    "src/infrastructure/db/database.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@abstractmethod",
+]
