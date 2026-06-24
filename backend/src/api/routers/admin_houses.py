@@ -38,7 +38,7 @@ async def admin_list_houses(
 ) -> list[HouseOut]:
     async with uow() as uw:
         houses = await uw.houses.list_all()
-        return [await build_house_out(uw, h, s3) for h in houses]
+        return [await build_house_out(uw, h) for h in houses]
 
 
 @router.post("", response_model=HouseOut, status_code=status.HTTP_201_CREATED)
@@ -51,7 +51,7 @@ async def create_house(
 ) -> HouseOut:
     async with uow(autocommit=True) as uw:
         house = await uw.houses.create(house_in_to_write_data(body))
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.put("/{house_id}", response_model=HouseOut)
@@ -67,7 +67,7 @@ async def update_house(
         house = await uw.houses.update(house_id, house_in_to_write_data(body))
         if house is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="House not found")
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.delete("/{house_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -121,7 +121,7 @@ async def upload_avatar(
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
         house = await uw.houses.set_avatar_s3_key(house_id, key)
         assert house is not None
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.delete("/{house_id}/avatar", response_model=HouseOut)
@@ -140,7 +140,7 @@ async def delete_avatar(
             _delete_s3_keys(s3, [house.avatar_s3_key])
         house = await uw.houses.set_avatar_s3_key(house_id, None)
         assert house is not None
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.post("/{house_id}/photos", response_model=HouseOut)
@@ -182,7 +182,7 @@ async def upload_photo(
         )
         house = await uw.houses.get_by_id(house_id)
         assert house is not None
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.delete("/{house_id}/photos/{photo_id}", response_model=HouseOut)
@@ -203,7 +203,7 @@ async def delete_photo(
         house = await uw.houses.get_by_id(house_id)
         if house is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="House not found")
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.post("/{house_id}/videos", response_model=HouseOut)
@@ -245,7 +245,7 @@ async def upload_video(
         )
         house = await uw.houses.get_by_id(house_id)
         assert house is not None
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.delete("/{house_id}/videos/{video_id}", response_model=HouseOut)
@@ -266,7 +266,7 @@ async def delete_video(
         house = await uw.houses.get_by_id(house_id)
         if house is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="House not found")
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.post("/{house_id}/video-links", response_model=HouseOut)
@@ -297,7 +297,7 @@ async def add_video_link(
         )
         house = await uw.houses.get_by_id(house_id)
         assert house is not None
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.delete("/{house_id}/video-links/{link_id}", response_model=HouseOut)
@@ -317,7 +317,7 @@ async def delete_video_link(
         house = await uw.houses.get_by_id(house_id)
         if house is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="House not found")
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.post("/{house_id}/model", response_model=HouseOut)
@@ -358,7 +358,7 @@ async def upload_model(
         )
         house = await uw.houses.get_by_id(house_id)
         assert house is not None
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
 
 
 @router.delete("/{house_id}/model", response_model=HouseOut)
@@ -378,4 +378,4 @@ async def delete_model(
         house = await uw.houses.get_by_id(house_id)
         if house is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="House not found")
-        return await build_house_out(uw, house, s3)
+        return await build_house_out(uw, house)
