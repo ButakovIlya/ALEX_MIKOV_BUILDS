@@ -60,11 +60,12 @@ class S3Storage:
         except ClientError as exc:
             raise StorageError(f"Delete failed: {exc}") from exc
 
-    def get_object_stream(self, key: str) -> tuple[object, str]:
+    def get_object_stream(self, key: str) -> tuple[object, str, int | None]:
         try:
             response = self._client.get_object(Bucket=self._bucket, Key=key)
             content_type = response.get("ContentType") or "model/gltf-binary"
-            return response["Body"], content_type
+            content_length = response.get("ContentLength")
+            return response["Body"], content_type, content_length
         except ClientError as exc:
             raise StorageError(f"Download failed: {exc}") from exc
 

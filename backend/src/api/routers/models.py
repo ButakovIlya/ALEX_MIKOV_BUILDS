@@ -67,11 +67,14 @@ async def download_model_file(
         direct_url = s3.get_public_download_url(model.s3_key)
         if direct_url:
             return RedirectResponse(direct_url, status_code=307)
-        stream, content_type = s3.get_object_stream(model.s3_key)
+        stream, content_type, content_length = s3.get_object_stream(model.s3_key)
     except StorageError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return StreamingResponse(
         stream,
         media_type=content_type,
-        headers={"Cache-Control": "public, max-age=604800, immutable"},
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            **({"Content-Length": str(content_length)} if content_length is not None else {}),
+        },
     )

@@ -12,7 +12,7 @@ function isGlbStreamUrl(url: string): boolean {
 
 export function isGlbUrl(url: string): boolean {
   const lower = url.toLowerCase()
-  return lower.endsWith(GLB_EXTENSION) || isGlbStreamUrl(url)
+  return lower.startsWith('blob:') || lower.endsWith(GLB_EXTENSION) || isGlbStreamUrl(url)
 }
 
 export function assertGlbUrl(url: string): string {

@@ -32,6 +32,80 @@ function useCoarsePointer() {
   return coarse
 }
 
+type GlbDownloadState = {
+  url: string | null
+  loadedBytes: number
+  totalBytes: number | null
+  error: string | null
+}
+
+function useGlbDownload(glb: string): GlbDownloadState {
+  const [state, setState] = useState<GlbDownloadState>({
+    url: null,
+    loadedBytes: 0,
+    totalBytes: null,
+    error: null,
+  })
+
+  useEffect(() => {
+    const controller = new AbortController()
+    let objectUrl: string | null = null
+
+    setState({ url: null, loadedBytes: 0, totalBytes: null, error: null })
+
+    async function download() {
+      try {
+        const res = await fetch(glb, { signal: controller.signal })
+        if (!res.ok) throw new Error(`GLB download failed: ${res.status}`)
+
+        const totalBytesHeader = res.headers.get('Content-Length')
+        const totalBytes = totalBytesHeader ? Number(totalBytesHeader) : null
+
+        if (!res.body) {
+          const blob = await res.blob()
+          objectUrl = URL.createObjectURL(blob)
+          setState({ url: objectUrl, loadedBytes: blob.size, totalBytes: blob.size, error: null })
+          return
+        }
+
+        const reader = res.body.getReader()
+        const chunks: Uint8Array[] = []
+        let loadedBytes = 0
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          if (!value) continue
+          chunks.push(value)
+          loadedBytes += value.byteLength
+          setState({ url: null, loadedBytes, totalBytes, error: null })
+        }
+
+        const blob = new Blob(chunks, { type: res.headers.get('Content-Type') ?? 'model/gltf-binary' })
+        objectUrl = URL.createObjectURL(blob)
+        setState({ url: objectUrl, loadedBytes, totalBytes: totalBytes ?? loadedBytes, error: null })
+      } catch (err) {
+        if (controller.signal.aborted) return
+        setState({
+          url: null,
+          loadedBytes: 0,
+          totalBytes: null,
+          error: err instanceof Error ? err.message : 'GLB download failed',
+        })
+      }
+    }
+
+    void download()
+
+    return () => {
+      controller.abort()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [glb])
+
+  return state
+}
+
 interface ModelViewerProps {
   glb: string
   className?: string
@@ -42,6 +116,7 @@ interface ModelViewerProps {
 export function ModelViewer({ glb, className = '', variant = 'compact', title }: ModelViewerProps) {
   assertGlbUrl(glb)
 
+  const glbDownload = useGlbDownload(glb)
   const containerRef = useRef<HTMLDivElement>(null)
   const controlsRef = useRef<CameraControlsHandle>(null)
   const [settings, setSettings] = useState<ViewerSettings>(defaultViewerSettings)
@@ -58,10 +133,22 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
 
   useEffect(() => {
     setLoading(true)
-  }, [glb, fitKey])
+  }, [glb])
+
+  useEffect(() => {
+    if (!glbDownload.url || !loading) return
+    const id = window.setTimeout(() => setLoading(false), 1200)
+    return () => window.clearTimeout(id)
+  }, [glbDownload.url, loading])
 
   const patchSettings = useCallback((patch: Partial<ViewerSettings>) => {
     setSettings((prev) => ({ ...prev, ...patch }))
+  }, [])
+
+  const handleLoaded = useCallback(() => {
+    setLoading(false)
+    window.setTimeout(() => controlsRef.current?.reset(), 700)
+    window.setTimeout(() => controlsRef.current?.reset(), 1200)
   }, [])
 
   const resetView = useCallback(() => {
@@ -72,6 +159,11 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
   const refitView = useCallback(() => {
     setFitKey((k) => k + 1)
   }, [])
+
+  useEffect(() => {
+    if (!glbDownload.url) return
+    requestAnimationFrame(refitView)
+  }, [glbDownload.url, refitView])
 
   useEffect(() => {
     const el = containerRef.current
@@ -229,13 +321,13 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
         <ambientLight intensity={settings.ambientIntensity} />
         <directionalLight position={[5, 8, 5]} intensity={settings.directIntensity} castShadow={effectiveShowShadows} />
         <Suspense fallback={<GlbLoader />}>
-          <Bounds key={fitKey} fit clip margin={1.15}>
+          <Bounds key={`${fitKey}-${glbDownload.url ?? 'pending'}`} fit clip margin={1.15}>
             <Center>
-              <GlbScene glb={glb} wireframe={settings.wireframe} />
+              {glbDownload.url && <GlbScene glb={glbDownload.url} wireframe={settings.wireframe} />}
             </Center>
           </Bounds>
           {!lowPowerControls && <Environment preset={settings.environment} />}
-          <LoadedMarker onLoaded={() => setLoading(false)} />
+          <LoadedMarker key={glbDownload.url} onLoaded={handleLoaded} />
         </Suspense>
         {settings.showGrid && (
           <Grid
@@ -257,11 +349,33 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
         <CameraControls ref={controlsRef} settings={settings} fitKey={fitKey} allowZoom={hasFullControls} />
       </Canvas>
 
-      {loading && (
+      {(loading || !glbDownload.url || glbDownload.error) && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-ink/40">
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold border-t-transparent" />
-            <span className="text-xs text-white/70">Загрузка .glb…</span>
+          <div className="flex w-48 flex-col items-center gap-2">
+            {glbDownload.error ? (
+              <span className="text-center text-xs text-red-200">{glbDownload.error}</span>
+            ) : (
+              <>
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                  {glbDownload.totalBytes ? (
+                    <div
+                      className="h-full rounded-full bg-gold transition-[width]"
+                      style={{
+                        width: `${Math.min(100, Math.round((glbDownload.loadedBytes / glbDownload.totalBytes) * 100))}%`,
+                      }}
+                    />
+                  ) : (
+                    <div className="h-full w-1/3 animate-pulse rounded-full bg-gold" />
+                  )}
+                </div>
+                <span className="text-xs text-white/70">
+                  {glbDownload.totalBytes
+                    ? `Загрузка .glb ${Math.min(100, Math.round((glbDownload.loadedBytes / glbDownload.totalBytes) * 100))}%`
+                    : 'Загрузка .glb…'}
+                </span>
+              </>
+            )}
           </div>
         </div>
       )}

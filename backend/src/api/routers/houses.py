@@ -44,6 +44,13 @@ VIDEO_TYPES = {
 }
 
 
+def cache_headers(cache_control: str, content_length: int | None = None) -> dict[str, str]:
+    headers = {"Cache-Control": cache_control}
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    return headers
+
+
 def avatar_url(house_id: UUID) -> str:
     return f"/api/v1/houses/{house_id}/avatar/file"
 
@@ -198,10 +205,10 @@ async def download_avatar(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Avatar not found")
         key = house.avatar_s3_key
     try:
-        stream, content_type = s3.get_object_stream(key)
+        stream, content_type, content_length = s3.get_object_stream(key)
     except StorageError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-    return StreamingResponse(stream, media_type=content_type, headers={"Cache-Control": "public, max-age=86400"})
+    return StreamingResponse(stream, media_type=content_type, headers=cache_headers("public, max-age=86400", content_length))
 
 
 @router.get("/{house_id}/photos/{photo_id}/file")
@@ -217,12 +224,12 @@ async def download_photo(
         if photo is None or photo.house_id != house_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo not found")
     try:
-        stream, content_type = s3.get_object_stream(photo.s3_key)
+        stream, content_type, content_length = s3.get_object_stream(photo.s3_key)
     except StorageError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     ext = photo.original_filename.rsplit(".", 1)[-1].lower()
     media_type = IMAGE_TYPES.get(ext, content_type)
-    return StreamingResponse(stream, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"})
+    return StreamingResponse(stream, media_type=media_type, headers=cache_headers("public, max-age=86400", content_length))
 
 
 @router.get("/{house_id}/videos/{video_id}/file")
@@ -238,12 +245,12 @@ async def download_video(
         if video is None or video.house_id != house_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
     try:
-        stream, content_type = s3.get_object_stream(video.s3_key)
+        stream, content_type, content_length = s3.get_object_stream(video.s3_key)
     except StorageError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     ext = video.original_filename.rsplit(".", 1)[-1].lower()
     media_type = VIDEO_TYPES.get(ext, content_type)
-    return StreamingResponse(stream, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"})
+    return StreamingResponse(stream, media_type=media_type, headers=cache_headers("public, max-age=86400", content_length))
 
 
 @router.get("/{house_id}/model/file")
@@ -258,11 +265,11 @@ async def download_model(
         if model is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
     try:
-        stream, content_type = s3.get_object_stream(model.s3_key)
+        stream, content_type, content_length = s3.get_object_stream(model.s3_key)
     except StorageError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return StreamingResponse(
         stream,
         media_type=content_type,
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers=cache_headers("public, max-age=86400", content_length),
     )
