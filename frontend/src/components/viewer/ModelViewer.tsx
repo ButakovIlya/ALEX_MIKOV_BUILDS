@@ -20,6 +20,18 @@ function LoadedMarker({ onLoaded }: { onLoaded: () => void }) {
   return null
 }
 
+function useCoarsePointer() {
+  const [coarse, setCoarse] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(pointer: coarse)')
+    const update = () => setCoarse(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return coarse
+}
+
 interface ModelViewerProps {
   glb: string
   className?: string
@@ -38,6 +50,11 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
   const [showHelp, setShowHelp] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const isCoarsePointer = useCoarsePointer()
+  const hasFullControls = variant === 'full' || isFullscreen
+  const lowPowerControls = isCoarsePointer && (settings.flyMode || settings.autoRotate)
+  const effectiveHd = settings.hd && !lowPowerControls
+  const effectiveShowShadows = settings.showShadows && !lowPowerControls
 
   useEffect(() => {
     setLoading(true)
@@ -120,7 +137,7 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
   }, [refitView])
 
   useEffect(() => {
-    if (variant !== 'full') return
+    if (!hasFullControls) return
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return
       const key = e.key.toLowerCase()
@@ -189,7 +206,7 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [variant, resetView, patchSettings, settings.autoRotate, settings.flyMode, takeScreenshot])
+  }, [hasFullControls, resetView, patchSettings, settings.autoRotate, settings.flyMode, takeScreenshot])
 
   useEffect(() => {
     if (!settings.flyMode) clearFlyTouchKeys()
@@ -201,23 +218,23 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
       className={`group relative overflow-hidden rounded-xl bg-[radial-gradient(ellipse_at_center,#5a5a5a_0%,#353535_50%,#222_100%)] ${className}`}
     >
       <Canvas
-        shadows
-        dpr={settings.hd ? [1, 2] : 1}
-        gl={{ preserveDrawingBuffer: true, antialias: settings.hd }}
+        shadows={effectiveShowShadows}
+        dpr={effectiveHd ? [1, 2] : 1}
+        gl={{ preserveDrawingBuffer: true, antialias: effectiveHd }}
         camera={{ position: [4, 3, 5], fov: 45 }}
         className="h-full w-full"
         style={{ touchAction: 'none', userSelect: 'none' }}
         aria-label={`3D view of ${title ?? 'model'}`}
       >
         <ambientLight intensity={settings.ambientIntensity} />
-        <directionalLight position={[5, 8, 5]} intensity={settings.directIntensity} castShadow={settings.showShadows} />
+        <directionalLight position={[5, 8, 5]} intensity={settings.directIntensity} castShadow={effectiveShowShadows} />
         <Suspense fallback={<GlbLoader />}>
           <Bounds key={fitKey} fit clip margin={1.15}>
             <Center>
               <GlbScene glb={glb} wireframe={settings.wireframe} />
             </Center>
           </Bounds>
-          <Environment preset={settings.environment} />
+          {!lowPowerControls && <Environment preset={settings.environment} />}
           <LoadedMarker onLoaded={() => setLoading(false)} />
         </Suspense>
         {settings.showGrid && (
@@ -234,10 +251,10 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
             sectionColor="#8B3A2A"
           />
         )}
-        {settings.showShadows && (
+        {effectiveShowShadows && (
           <ContactShadows position={[0, -0.01, 0]} opacity={0.45} scale={16} blur={2.5} far={12} />
         )}
-        <CameraControls ref={controlsRef} settings={settings} fitKey={fitKey} allowZoom={variant === 'full'} />
+        <CameraControls ref={controlsRef} settings={settings} fitKey={fitKey} allowZoom={hasFullControls} />
       </Canvas>
 
       {loading && (
@@ -275,7 +292,7 @@ export function ModelViewer({ glb, className = '', variant = 'compact', title }:
         }}
       />
 
-      {variant === 'full' && settings.flyMode && <MobileFlyPad />}
+      {hasFullControls && settings.flyMode && <MobileFlyPad />}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import type { EnvironmentPreset, ViewerSettings, ViewerVariant } from './viewerState'
 
 interface ViewerToolbarProps {
@@ -32,10 +32,16 @@ function IconButton({
   onClick: () => void
   title: string
 }) {
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    onClick()
+  }
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       title={title}
       aria-label={title}
       aria-pressed={active}
@@ -393,18 +399,14 @@ function FullDock(props: ViewerToolbarProps) {
 }
 
 function CompactDock(props: ViewerToolbarProps) {
-  const { settings, onPatch, onReset } = props
+  const { onReset, onToggleFullscreen } = props
   return (
     <div className="absolute bottom-3 right-3 z-10 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
       <IconButton onClick={onReset} title="Сброс">
         <span className="text-sm">↺</span>
       </IconButton>
-      <IconButton
-        onClick={() => onPatch({ autoRotate: !settings.autoRotate })}
-        active={settings.autoRotate}
-        title="Тур"
-      >
-        <RotateIcon />
+      <IconButton onClick={onToggleFullscreen} title="На весь экран">
+        <FullscreenIcon />
       </IconButton>
     </div>
   )
@@ -413,7 +415,7 @@ function CompactDock(props: ViewerToolbarProps) {
 export function ViewerToolbar(props: ViewerToolbarProps) {
   return (
     <>
-      {props.variant === 'compact' ? <CompactDock {...props} /> : <FullDock {...props} />}
+      {props.variant === 'compact' && !props.isFullscreen ? <CompactDock {...props} /> : <FullDock {...props} />}
       <div className="pointer-events-none absolute bottom-2 left-3 rounded bg-black/30 px-2 py-0.5 text-[10px] text-white/70">
         .glb viewer
       </div>

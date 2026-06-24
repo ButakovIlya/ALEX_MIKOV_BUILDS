@@ -113,10 +113,7 @@ export const FlyCameraControls = forwardRef<FlyCameraHandle, FlyCameraControlsPr
       const onPointerMove = (e: PointerEvent) => {
         if (!looking.current || !lastPointer.current) return
 
-        const samples =
-          e.pointerType === 'touch' && typeof e.getCoalescedEvents === 'function'
-            ? e.getCoalescedEvents()
-            : [e]
+        const samples = [e]
 
         let prev = lastPointer.current
         const sens = lookRef.current
