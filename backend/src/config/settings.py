@@ -1,8 +1,19 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(
+            _REPO_ROOT / ".env.default",
+            _REPO_ROOT / ".env",
+        ),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     app_name: str = "Mikov Cottages API"
     debug: bool = False
@@ -31,7 +42,7 @@ class Settings(BaseSettings):
     s3_use_ssl: bool = False
 
     nominatim_base_url: str = "https://nominatim.openstreetmap.org"
-    nominatim_user_agent: str = "mikov-cottages/1.0 (local-dev)"
+    nominatim_user_agent: str = "mikov-cottages/1.0 (docker)"
     nominatim_country_codes: str = "ru"
     # Perm krai bias: west, north, east, south (lon/lat)
     nominatim_viewbox: str | None = "57.85,56.65,58.25,55.75"

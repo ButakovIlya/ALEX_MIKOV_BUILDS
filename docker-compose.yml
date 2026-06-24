@@ -1,6 +1,13 @@
+# Works without .env — defaults in this file + .env.default.
+# Optional overrides: create .env or docker compose --env-file .env up
+
 services:
   postgres:
     image: postgres:16-alpine
+    env_file:
+      - .env.default
+      - path: .env
+        required: false
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-mikov}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mikov}
@@ -18,6 +25,10 @@ services:
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
+    env_file:
+      - .env.default
+      - path: .env
+        required: false
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
@@ -34,6 +45,10 @@ services:
 
   api:
     build: ./backend
+    env_file:
+      - .env.default
+      - path: .env
+        required: false
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -41,15 +56,23 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mikov}
       POSTGRES_DB: ${POSTGRES_DB:-mikov}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-1440}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       S3_ENDPOINT_URL: http://minio:9000
-      S3_PUBLIC_ENDPOINT_URL: http://localhost:9000
-      S3_PUBLIC_BASE_PATH: /storage
+      S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
+      S3_PUBLIC_BASE_PATH: ${S3_PUBLIC_BASE_PATH:-/storage}
+      S3_PRESIGN_EXPIRES_SECONDS: ${S3_PRESIGN_EXPIRES_SECONDS:-3600}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
       S3_BUCKET: ${S3_BUCKET:-models}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_USE_SSL: ${S3_USE_SSL:-false}
+      NOMINATIM_BASE_URL: ${NOMINATIM_BASE_URL:-https://nominatim.openstreetmap.org}
       NOMINATIM_USER_AGENT: ${NOMINATIM_USER_AGENT:-mikov-cottages/1.0 (docker)}
+      NOMINATIM_COUNTRY_CODES: ${NOMINATIM_COUNTRY_CODES:-ru}
+      NOMINATIM_VIEWBOX: ${NOMINATIM_VIEWBOX:-57.85,56.65,58.25,55.75}
     depends_on:
       postgres:
         condition: service_healthy
