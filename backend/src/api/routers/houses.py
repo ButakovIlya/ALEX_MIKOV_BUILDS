@@ -56,8 +56,8 @@ def video_url(house_id: UUID, video_id: UUID) -> str:
     return f"/api/v1/houses/{house_id}/videos/{video_id}/file"
 
 
-def model_url(house_id: UUID) -> str:
-    return f"/api/v1/houses/{house_id}/model/file"
+def model_url(house_id: UUID, model_id: UUID) -> str:
+    return f"/api/v1/houses/{house_id}/model/file?v={model_id}"
 
 
 def photo_to_out(photo: HousePhotoEntity) -> HousePhotoOut:
@@ -95,7 +95,7 @@ def video_link_to_out(link: HouseVideoLinkEntity) -> HouseVideoLinkOut:
 def glb_to_out(house_id: UUID, model: HouseModelEntity) -> HouseGlbOut:
     return HouseGlbOut(
         id=model.id,
-        url=model_url(house_id),
+        url=model_url(house_id, model.id),
         original_filename=model.original_filename,
         file_size_bytes=model.file_size_bytes,
     )
@@ -104,7 +104,7 @@ def glb_to_out(house_id: UUID, model: HouseModelEntity) -> HouseGlbOut:
 def model_list_url(house_id: UUID, glb: HouseModelEntity | None) -> str | None:
     if glb is None:
         return None
-    return model_url(house_id)
+    return model_url(house_id, glb.id)
 
 
 async def build_house_out(uw: SqlAlchemyUnitOfWork, house: HouseEntity) -> HouseOut:
@@ -264,5 +264,5 @@ async def download_model(
     return StreamingResponse(
         stream,
         media_type=content_type,
-        headers={"Cache-Control": "public, max-age=604800, immutable"},
+        headers={"Cache-Control": "public, max-age=86400"},
     )

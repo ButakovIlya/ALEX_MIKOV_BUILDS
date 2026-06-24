@@ -1,3 +1,5 @@
+import { expireAdminSessionOnUnauthorized } from './auth'
+
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 function authHeaders(): Record<string, string> {
@@ -36,6 +38,7 @@ export function uploadFormData(
         onProgress(100)
         resolve()
       } else {
+        expireAdminSessionOnUnauthorized(xhr.status)
         void parseUploadError(xhr).then(reject)
       }
     }

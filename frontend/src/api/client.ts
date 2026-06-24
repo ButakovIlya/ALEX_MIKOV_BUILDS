@@ -1,4 +1,5 @@
 import type { HouseSpecs } from './houseEnums'
+import { expireAdminSessionOnUnauthorized } from './auth'
 import { uploadFormData } from './upload'
 
 export type HousePhoto = {
@@ -110,7 +111,10 @@ async function parseError(res: Response): Promise<string> {
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
-  if (!res.ok) throw new Error(await parseError(res))
+  if (!res.ok) {
+    expireAdminSessionOnUnauthorized(res.status)
+    throw new Error(await parseError(res))
+  }
   return res.json() as Promise<T>
 }
 
@@ -160,7 +164,10 @@ export async function deleteHouse(id: string): Promise<void> {
     method: 'DELETE',
     headers: authHeaders(),
   })
-  if (!res.ok) throw new Error(await parseError(res))
+  if (!res.ok) {
+    expireAdminSessionOnUnauthorized(res.status)
+    throw new Error(await parseError(res))
+  }
 }
 
 export async function uploadHouseAvatar(

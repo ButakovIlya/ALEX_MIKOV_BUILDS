@@ -21,6 +21,7 @@ import {
   uploadHouseVideo,
   type House,
 } from '../api/client'
+import { ADMIN_AUTH_EXPIRED_EVENT } from '../api/auth'
 import { AdminCard, AdminTabs, type AdminTab } from '../components/admin/AdminCard'
 import { DropZone } from '../components/admin/DropZone'
 import { HouseSpecsForm } from '../components/admin/HouseSpecsForm'
@@ -97,6 +98,18 @@ export function AdminPage() {
   useEffect(() => {
     if (loggedIn) void loadHouses()
   }, [loggedIn, loadHouses])
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setLoggedIn(false)
+      setHouses([])
+      setSelectedId(null)
+      setError(null)
+      setLoginError('Сессия истекла. Войдите снова.')
+    }
+    window.addEventListener(ADMIN_AUTH_EXPIRED_EVENT, handleAuthExpired)
+    return () => window.removeEventListener(ADMIN_AUTH_EXPIRED_EVENT, handleAuthExpired)
+  }, [])
 
   useEffect(() => {
     if (!selected) return
