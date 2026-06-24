@@ -88,3 +88,4 @@ skills-lock.json
 .cache/
 tmp/
 temp/
+*.glb
